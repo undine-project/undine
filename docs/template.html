@@ -4,6 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mermaid Diagram</title>
+    <style>
+
+
+        ul.tabs {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            border-bottom: 1px solid #888;
+        }
+
+        ul.tabs li {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            border-top: 2px solid transparent;
+            border-left: 1px solid #888;
+            border-right: 1px solid #888;
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+            background-color: #8a9a9a;
+        }
+
+        ul.tabs li:hover {
+            background-color: #e0e0e0;
+        }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script>
         let panX = {};
