@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid Diagram</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: hsl(180, 1.5873015873%, 28.3529411765%);
+        }
+
+        ul.tabs {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            border-bottom: 1px solid #888;
+        }
+
+        ul.tabs li {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            border-top: 2px solid transparent;
+            border-left: 1px solid #888;
+            border-right: 1px solid #888;
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+            background-color: #8a9a9a;
+        }
+
+        ul.tabs li:hover {
+            background-color: #e0e0e0;
+        }
+
+        #reconnecting {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: red;
+            color: white;
+            padding: 10px;
+        }
+
+        .mermaid {
+            height: 90vh;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .mermaid .type-entity>rect {
+            fill: #9fe3ff !important;
+            stroke: #0887b6 !important;
+        }
+        .mermaid .type-entity span {
+            color: #044370 !important;
+        }
+
+        .mermaid .type-presentation>rect {
+            fill: #ffffde !important;
+            stroke: #aaaa33 !important;
+        }
+        .mermaid .type-presentation span {
+            color: #555508 !important;
+        }
+
+        .mermaid .type-external>rect {
+            fill: #b9ffc2 !important;
+            stroke: #3b9f24 !important;
+        }
+        .mermaid .type-external span {
+            color: #002e06 !important;
+        }
+
+        .mermaid .type-module>rect {
+            fill: rgba(255, 255, 127, 0.32) !important;
+            stroke: #aaaa33 !important;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        let panX = {};
+        let panY = {};
+        let scale = {};
+        let reconnectingElement, svgContainers = [], svgElements = [];
+
+        (function() {
+            function connectToUpdate() {
+                const eventSource = new EventSource('/reload');
+
+                eventSource.onopen = function () {
+                    if (reconnectingElement) {
+                        reconnectingElement.remove();
+                        reconnectingElement = null;
+                    }
+                }
+
+                eventSource.onmessage = async function (event) {
+                    if (reconnectingElement) {
+                        reconnectingElement.remove();
+                        reconnectingElement = null;
+                    }
+
+                    if (event.data === "connected") {
+                        return;
+                    }
+
+                    const {block, content} = JSON.parse(event.data);
+                    console.log('received a message with type and content', block, content)
+
+                    if (block === 'template') {
+                        location.reload();
+
+                        return;
+                    }
+
+                    const style = svgElements[block]?.style.transform
+                    const { svg } = await mermaid.render('graphDiv', content);
+                    document.getElementById(`mermaid-${block}`).innerHTML = svg;
+                    svgElements[block] = svgContainers[block].firstChild
+                    svgElements[block].style.transform = style
+                    initControls(block)
+                };
+
+                eventSource.onerror = function () {
+                    eventSource.close();
+                    if (!reconnectingElement) {
+                        reconnectingElement = document.createElement('div');
+                        reconnectingElement.id = 'reconnecting';
+                        reconnectingElement.innerText = 'Connection with server lost. Reconnecting...';
+                        document.body.insertBefore(reconnectingElement, document.body.firstChild);
+                    }
+                    setTimeout(connectToUpdate, 1000);
+                };
+            }
+
+            window.onload = function () {
+                const devMode = {{devMode}};
+                if (devMode) {
+                    connectToUpdate();
+                }
+
+                const svgContainersArray = Array.from(document.querySelectorAll('.mermaid'));
+                for (const element of svgContainersArray) {
+                    const type = element.id.replace('mermaid-', '');
+                    svgContainers[type] = element;
+                    panX[type] = 0;
+                    panY[type] = 0;
+                    scale[type] = 1;
+                }
+                svgContainers = Array.from(document.querySelectorAll('.mermaid')).reduce((map, element) => {
+                    const type = element.id.replace('mermaid-', '');
+                    map[type] = element;
+                    return map;
+                }, {})
+
+                mermaid.initialize({
+                    startOnLoad: true,
+                    securityLevel: 'loose',
+                });
+                svgElements = Object.fromEntries(Object.keys(svgContainers).map(type => [type, svgContainers[type].firstChild]))
+                Object.entries(svgElements).forEach(([type]) => initControls(type))
+
+                Object.entries(svgContainers).forEach(([type, container]) => {
+                    container.addEventListener('wheel', function (e) {
+                        e.preventDefault();
+                        console.log(type)
+                        const zoomAmount = 1.05;
+                        if (e.deltaY < 0) {
+                            scale[type] *= zoomAmount;
+                        } else {
+                            scale[type] /= zoomAmount;
+                        }
+                        updateTransform(type);
+                    });
+                });
+            };
+
+            initControls = (type) => {
+                let isDragging = false;
+                let startX, startY;
+
+                svgContainers[type].addEventListener('mousedown', function (e) {
+                    isDragging = true;
+                    startX = e.clientX - panX[type];
+                    startY = e.clientY - panY[type];
+                    svgContainers[type].style.cursor = 'grabbing';
+                });
+
+                window.addEventListener('mousemove', function (e) {
+                    if (isDragging) {
+                        panX[type] = e.clientX - startX;
+                        panY[type] = e.clientY - startY;
+                        updateTransform(type);
+                    }
+                });
+
+                window.addEventListener('mouseup', function () {
+                    isDragging = false;
+                    svgContainers[type].style.cursor = 'grab';
+                });
+            }
+        })();
+
+        function updateTransform(type) {
+            svgElements[type].style.transform = `translate(${panX[type]}px, ${panY[type]}px) scale(${scale[type]})`;
+        }
+    </script>
+
+    <script>
+        window.addEventListener('hashchange', function () {
+            const anchor = window.location.hash.replace('#', '');
+            const elements = Array.from(document.querySelectorAll('.mermaid'));
+            elements.forEach(element => element.style.display = 'none');
+            const element = document.getElementById(`mermaid-${anchor}`);
+            if (element) {
+                element.style.display = 'block';
+            } else {
+                elements[0].style.display = 'block';
+            }
+        });
+        window.addEventListener('load', function () {
+            let element
+            const anchor = window.location.hash.replace('#', '');
+            const elements = Array.from(document.querySelectorAll('.mermaid'));
+
+            elements.forEach(element => element.style.display = 'none');
+
+            if (anchor) {
+                element = document.getElementById(`mermaid-${anchor}`);
+            }
+
+            if (!element) {
+                element = elements[0]
+            }
+
+            element.style.display = 'block';
+        });
+    </script>
+</head>
+<body>
+<ul class="tabs">{{tabs}}</ul>
+{{graphs}}
+</body>
+</html>

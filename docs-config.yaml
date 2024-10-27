@@ -1,0 +1,9 @@
+templatePath: docs/template.html
+files:
+  - name: diagram-1
+    path: docs/diagram-1.md
+    title: Urban Park Ecosystem
+
+  - name: diagram-2
+    path: docs/diagram-2.md
+    title: Software Deployment Pipeline State Diagram
