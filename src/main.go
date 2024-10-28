@@ -60,39 +60,7 @@ func main() {
 	}
 
 	if cmd.WatchMode {
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
-		go func() {
-			sig := <-sigChan
-			log.Printf("Received signal %s, exiting...", sig)
-			os.Exit(0)
-		}()
-
-		go func() {
-			contentsChannel := make(chan builder.FileContent, 2)
-			sp.Watch(contentsChannel)
-			defer sp.Stop()
-
-			wh := &builder.WebHandler{}
-			wh.StartServer()
-
-			for content := range contentsChannel {
-				fmt.Printf("Generating HTML file with type %s\n", content.Name)
-				fg.SetContent(content)
-				err := fg.Generate()
-				if err != nil {
-					log.Fatal(err)
-
-					return
-				}
-
-				fmt.Println("Sending content...")
-				wh.SendContent(content)
-			}
-		}()
-
-		// Keep the main goroutine running to prevent the program from exiting
-		select {}
+		startWatching(sp, fg)
 	} else {
 		fmt.Println("HTML generated without watching.")
 	}
@@ -126,4 +94,40 @@ func loadConfig() config {
 	}
 
 	return c
+}
+
+func startWatching(sourceProcessor *builder.SourceProcessor, generator *builder.FileGenerator) {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		sig := <-sigChan
+		log.Printf("Received signal %s, exiting...", sig)
+		os.Exit(0)
+	}()
+
+	go func() {
+		contentsChannel := make(chan builder.FileContent, 2)
+		sourceProcessor.Watch(contentsChannel)
+		defer sourceProcessor.Stop()
+
+		wh := &builder.WebHandler{}
+		wh.StartServer()
+
+		for content := range contentsChannel {
+			fmt.Printf("Generating HTML file with type %s\n", content.Name)
+			generator.SetContent(content)
+			err := generator.Generate()
+			if err != nil {
+				log.Fatal(err)
+
+				return
+			}
+
+			fmt.Println("Sending content...")
+			wh.SendContent(content)
+		}
+	}()
+
+	// Keep the main goroutine running to prevent the program from exiting
+	select {}
 }
