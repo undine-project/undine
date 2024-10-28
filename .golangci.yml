@@ -7,9 +7,6 @@ linters:
     - unused       # неиспользуемый код
     - misspell     # опечатки в комментариях
 
-run:
-  deadline: 5m
-
 issues:
   exclude-rules:
     - path: _test\.go
