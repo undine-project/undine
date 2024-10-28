@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/undine-project/undine/src/builder"
@@ -20,7 +19,6 @@ type config struct {
 
 func main() {
 	cmd.Execute()
-	flag.Parse()
 	c := loadConfig()
 
 	watcher, err := fsnotify.NewWatcher()
