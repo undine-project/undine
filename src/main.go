@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/undine-project/undine/src/builder"
+	"github.com/undine-project/undine/src/cmd"
 	"gopkg.in/yaml.v3"
 	"log"
 	"os"
@@ -12,14 +13,13 @@ import (
 	"syscall"
 )
 
-var watchFlag = flag.Bool("watch", false, "Watch for changes in the diagram.md file")
-
 type config struct {
 	TemplatePath string                   `yaml:"templatePath"`
 	Files        []builder.FileDefinition `yaml:"files"`
 }
 
 func main() {
+	cmd.Execute()
 	flag.Parse()
 	c := loadConfig()
 
@@ -48,7 +48,7 @@ func main() {
 	fg := builder.NewFileGenerator(
 		c.TemplatePath,
 		"public/index.html",
-		*watchFlag,
+		cmd.WatchMode,
 		files,
 	)
 	for content := range sp.Process() {
@@ -61,7 +61,7 @@ func main() {
 		return
 	}
 
-	if *watchFlag {
+	if cmd.WatchMode {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 		go func() {
