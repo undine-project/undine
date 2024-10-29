@@ -25,6 +25,7 @@ jobs:
 
       - name: Build binaries
         run: |
+          cd src
           GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/undine-windows-amd64.exe
           GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/undine-linux-amd64
           GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/undine-darwin-amd64
