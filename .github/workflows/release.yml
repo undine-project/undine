@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Важно для получения всей истории коммитов
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -18,10 +20,37 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Get version
-        id: get_version
+      - name: Get previous tag
+        id: previoustag
         run: |
-          echo "VERSION=$(date +'v%Y.%m.%d-%H%M')" >> $GITHUB_ENV
+          # Получаем последний релизный тег
+          PREVIOUS_TAG=$(git describe --tags --match "v[0-9]*" --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> $GITHUB_ENV
+          
+          # Разбираем версию на компоненты
+          IFS='.' read -r major minor patch <<< "${PREVIOUS_TAG#v}"
+          # Увеличиваем patch версию
+          NEW_TAG="v$major.$minor.$((patch + 1))"
+          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+
+      - name: Get commit message and generate changelog
+        id: commit_info
+        run: |
+          # Получаем сообщение текущего коммита для названия релиза
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "COMMIT_MSG=${COMMIT_MSG}" >> $GITHUB_ENV
+          
+          # Генерируем changelog
+          echo "## Changes since ${PREVIOUS_TAG}" > changelog.md
+          echo "" >> changelog.md
+          git log --pretty=format:"* %s (%an)" ${PREVIOUS_TAG}..HEAD >> changelog.md
+          
+          # Экранируем специальные символы в changelog для использования в GitHub Actions
+          CHANGELOG=$(cat changelog.md)
+          CHANGELOG="${CHANGELOG//'%'/'%25'}"
+          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
+          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
+          echo "CHANGELOG=${CHANGELOG}" >> $GITHUB_ENV
 
       - name: Build binaries
         run: |
@@ -33,8 +62,9 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.VERSION }}
-          name: Release ${{ env.VERSION }}
+          tag_name: ${{ env.NEW_TAG }}
+          name: ${{ env.COMMIT_MSG }}
+          body: ${{ env.CHANGELOG }}
           files: |
             bin/undine-windows-amd64.exe
             bin/undine-linux-amd64
