@@ -23,25 +23,32 @@ jobs:
       - name: Get previous tag and generate new version
         id: previoustag
         run: |
-          # Получаем последний тег
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
-          echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> $GITHUB_ENV
+          # Пытаемся получить последний тег
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           
-          # Проверяем, существуют ли уже теги в формате semver
-          if [[ $PREVIOUS_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            # Если тег уже в формате semver, просто увеличиваем patch версию
-            IFS='.' read -r major minor patch <<< "${PREVIOUS_TAG#v}"
-            NEW_TAG="v$major.$minor.$((patch + 1))"
-          else
-            # Если тег в старом формате или тегов нет, начинаем с v0.1.0
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # Если тегов нет, это первый релиз
+            PREVIOUS_TAG="none"
             NEW_TAG="v0.1.0"
-            # Проверяем, существует ли уже такой тег
-            while git rev-parse $NEW_TAG >/dev/null 2>&1; do
-              # Если тег существует, увеличиваем patch версию
-              IFS='.' read -r major minor patch <<< "${NEW_TAG#v}"
+          else
+            # Проверяем, существуют ли уже теги в формате semver
+            if [[ $PREVIOUS_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              # Если тег уже в формате semver, просто увеличиваем patch версию
+              IFS='.' read -r major minor patch <<< "${PREVIOUS_TAG#v}"
               NEW_TAG="v$major.$minor.$((patch + 1))"
-            done
+            else
+              # Если тег в старом формате, начинаем с v0.1.0
+              NEW_TAG="v0.1.0"
+              # Проверяем, существует ли уже такой тег
+              while git rev-parse $NEW_TAG >/dev/null 2>&1; do
+                # Если тег существует, увеличиваем patch версию
+                IFS='.' read -r major minor patch <<< "${NEW_TAG#v}"
+                NEW_TAG="v$major.$minor.$((patch + 1))"
+              done
+            fi
           fi
+          
+          echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> $GITHUB_ENV
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
       - name: Get commit hash and generate changelog
@@ -53,9 +60,18 @@ jobs:
           echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
           
           # Генерируем changelog
-          echo "## Changes since ${PREVIOUS_TAG}" > changelog.md
+          echo "## Changes" > changelog.md
           echo "" >> changelog.md
-          git log --pretty=format:"* %s (%an)" ${PREVIOUS_TAG}..HEAD >> changelog.md
+          
+          if [ "${PREVIOUS_TAG}" = "none" ]; then
+            # Для первого релиза берем всю историю
+            git log --pretty=format:"* %s (%an)" >> changelog.md
+          else
+            # Для последующих релизов берем изменения с последнего тега
+            echo "## Changes since ${PREVIOUS_TAG}" > changelog.md
+            echo "" >> changelog.md
+            git log --pretty=format:"* %s (%an)" ${PREVIOUS_TAG}..HEAD >> changelog.md
+          fi
           
           # Экранируем специальные символы в changelog для использования в GitHub Actions
           CHANGELOG=$(cat changelog.md)
