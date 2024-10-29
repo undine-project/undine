@@ -1,0 +1,79 @@
+name: Release Build
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Нужно для получения тегов
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Generate version
+        run: |
+          # Пытаемся получить последний тег
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # Если тегов нет, это первый релиз
+            NEW_TAG="v0.1.0"
+          else
+            # Проверяем, существуют ли уже теги в формате semver
+            if [[ $PREVIOUS_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              # Если тег уже в формате semver, увеличиваем patch версию
+              IFS='.' read -r major minor patch <<< "${PREVIOUS_TAG#v}"
+              NEW_TAG="v$major.$minor.$((patch + 1))"
+            else
+              # Если тег в старом формате, начинаем с v0.1.0
+              NEW_TAG="v0.1.0"
+              # Проверяем, существует ли уже такой тег
+              while git rev-parse $NEW_TAG >/dev/null 2>&1; do
+                # Если тег существует, увеличиваем patch версию
+                IFS='.' read -r major minor patch <<< "${NEW_TAG#v}"
+                NEW_TAG="v$major.$minor.$((patch + 1))"
+              done
+            fi
+          fi
+          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
+          # Получаем короткий хеш текущего коммита
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          echo "RELEASE_NAME=Release at #${COMMIT_HASH}" >> $GITHUB_ENV
+
+      - name: Build binaries
+        run: |
+          cd src
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ../bin/undine-windows-amd64.exe
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ../bin/undine-linux-amd64
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o ../bin/undine-darwin-amd64
+
+      - name: Create source archive
+        run: |
+          # Создаем архив с исходным кодом, исключая бинарные файлы и временные директории
+          git archive --prefix=undine-${{ env.NEW_TAG }}/ --format=zip -o bin/undine-${{ env.NEW_TAG }}.zip HEAD
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.NEW_TAG }}
+          name: ${{ env.RELEASE_NAME }}
+          files: |
+            bin/undine-windows-amd64.exe
+            bin/undine-linux-amd64
+            bin/undine-darwin-amd64
+            bin/undine-${{ env.NEW_TAG }}.zip
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
