@@ -70,17 +70,27 @@ func (wh *WebHandler) SendContent(content FileContent) {
 }
 
 func (wh *WebHandler) serveClient(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	_, _ = fmt.Fprintf(w, "data: connected\n\n")
-	w.(http.Flusher).Flush()
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := fmt.Fprintf(w, "data: connected\n\n"); err != nil {
+		log.Printf("Error sending initial message: %v", err)
+		return
+	}
+	flusher.Flush()
 
 	wh.connections.Store(r.RemoteAddr, w)
 	defer wh.connections.Delete(r.RemoteAddr)
 
-	if cn, ok := w.(http.CloseNotifier); ok {
-		<-cn.CloseNotify()
-		wh.connections.Delete(r.RemoteAddr)
-	}
+	<-ctx.Done()
+	log.Printf("Client %s disconnected: %v", r.RemoteAddr, ctx.Err())
 }
