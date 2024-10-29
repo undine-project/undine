@@ -36,9 +36,9 @@ jobs:
           tag_name: ${{ env.VERSION }}
           name: Release ${{ env.VERSION }}
           files: |
-            ../bin/undine-windows-amd64.exe
-            ../bin/undine-linux-amd64
-            ../bin/undine-darwin-amd64
+            bin/undine-windows-amd64.exe
+            bin/undine-linux-amd64
+            bin/undine-darwin-amd64
           draft: true
           prerelease: false
         env:
