@@ -28,7 +28,6 @@ jobs:
           
           if [ -z "$PREVIOUS_TAG" ]; then
             # Если тегов нет, это первый релиз
-            PREVIOUS_TAG="none"
             NEW_TAG="v0.1.0"
           else
             # Проверяем, существуют ли уже теги в формате semver
@@ -48,37 +47,15 @@ jobs:
             fi
           fi
           
-          echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> $GITHUB_ENV
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
 
-      - name: Get commit hash and generate changelog
+      - name: Get commit hash
         id: commit_info
         run: |
           # Получаем короткий хеш текущего коммита
           COMMIT_HASH=$(git rev-parse --short HEAD)
           RELEASE_NAME="Release at #${COMMIT_HASH}"
           echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
-          
-          # Генерируем changelog
-          echo "## Changes" > changelog.md
-          echo "" >> changelog.md
-          
-          if [ "${PREVIOUS_TAG}" = "none" ]; then
-            # Для первого релиза берем всю историю
-            git log --pretty=format:"* %s (%an)" >> changelog.md
-          else
-            # Для последующих релизов берем изменения с последнего тега
-            echo "## Changes since ${PREVIOUS_TAG}" > changelog.md
-            echo "" >> changelog.md
-            git log --pretty=format:"* %s (%an)" ${PREVIOUS_TAG}..HEAD >> changelog.md
-          fi
-          
-          # Экранируем специальные символы в changelog для использования в GitHub Actions
-          CHANGELOG=$(cat changelog.md)
-          CHANGELOG="${CHANGELOG//'%'/'%25'}"
-          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
-          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
-          echo "CHANGELOG=${CHANGELOG}" >> $GITHUB_ENV
 
       - name: Build binaries
         run: |
@@ -92,7 +69,6 @@ jobs:
         with:
           tag_name: ${{ env.NEW_TAG }}
           name: ${{ env.RELEASE_NAME }}
-          body: ${{ env.CHANGELOG }}
           files: |
             bin/undine-windows-amd64.exe
             bin/undine-linux-amd64
