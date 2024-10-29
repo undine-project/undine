@@ -2,7 +2,12 @@ name: Pull Request Checks
 
 on:
   pull_request:
-    branches: [ main ]
+    paths-ignore:
+      - docs/**
+      - public/**
+      - *.md
+      - *.yaml
+      - .gitignore
 
 jobs:
   verify:
