@@ -57,6 +57,11 @@ jobs:
           GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ../bin/undine-linux-amd64
           GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o ../bin/undine-darwin-amd64
 
+      - name: Create source archive
+        run: |
+          # Создаем архив с исходным кодом, исключая бинарные файлы и временные директории
+          git archive --prefix=undine-${{ env.NEW_TAG }}/ --format=zip -o bin/undine-${{ env.NEW_TAG }}.zip HEAD
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -66,8 +71,9 @@ jobs:
             bin/undine-windows-amd64.exe
             bin/undine-linux-amd64
             bin/undine-darwin-amd64
+            bin/undine-${{ env.NEW_TAG }}.zip
           draft: true
           prerelease: false
-          generate_release_notes: true  # Включаем автоматическую генерацию release notes
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
