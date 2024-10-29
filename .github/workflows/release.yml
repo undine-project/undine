@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Важно для получения всей истории коммитов
+          fetch-depth: 0  # Нужно для получения тегов
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -20,8 +20,7 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Get previous tag and generate new version
-        id: previoustag
+      - name: Generate version
         run: |
           # Пытаемся получить последний тег
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -32,7 +31,7 @@ jobs:
           else
             # Проверяем, существуют ли уже теги в формате semver
             if [[ $PREVIOUS_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              # Если тег уже в формате semver, просто увеличиваем patch версию
+              # Если тег уже в формате semver, увеличиваем patch версию
               IFS='.' read -r major minor patch <<< "${PREVIOUS_TAG#v}"
               NEW_TAG="v$major.$minor.$((patch + 1))"
             else
@@ -46,16 +45,10 @@ jobs:
               done
             fi
           fi
-          
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-
-      - name: Get commit hash
-        id: commit_info
-        run: |
           # Получаем короткий хеш текущего коммита
           COMMIT_HASH=$(git rev-parse --short HEAD)
-          RELEASE_NAME="Release at #${COMMIT_HASH}"
-          echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
+          echo "RELEASE_NAME=Release at #${COMMIT_HASH}" >> $GITHUB_ENV
 
       - name: Build binaries
         run: |
@@ -75,5 +68,6 @@ jobs:
             bin/undine-darwin-amd64
           draft: true
           prerelease: false
+          generate_release_notes: true  # Включаем автоматическую генерацию release notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
