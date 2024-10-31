@@ -1,16 +1,15 @@
-package support
+package builder
 
 import (
 	"fmt"
-	"github.com/undine-project/undine/src/builder"
 	"gopkg.in/yaml.v3"
 	"log"
 	"os"
 )
 
 type Config struct {
-	TemplatePath string                   `yaml:"templatePath"`
-	Files        []builder.FileDefinition `yaml:"files"`
+	TemplatePath string           `yaml:"templatePath"`
+	Files        []FileDefinition `yaml:"files"`
 }
 
 // LoadConfig Temporary, until #1 implemented
