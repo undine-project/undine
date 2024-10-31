@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/undine-project/undine/src/builder"
 	"log"
+	"os"
 )
 
 // buildCmd represents the build command
@@ -18,7 +19,14 @@ var buildCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer b.Close()
+		defer func() {
+			if err := b.Close(); err != nil {
+				log.Printf("Error closing builder: %v", err)
+				if err == nil {
+					os.Exit(1)
+				}
+			}
+		}()
 
 		if err := b.Initialize(false); err != nil {
 			log.Fatal(err)

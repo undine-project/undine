@@ -21,7 +21,14 @@ var watchCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer b.Close()
+		defer func() {
+			if err := b.Close(); err != nil {
+				log.Printf("Error closing builder: %v", err)
+				if err == nil {
+					os.Exit(1)
+				}
+			}
+		}()
 
 		if err := b.Initialize(true); err != nil {
 			log.Fatal(err)
