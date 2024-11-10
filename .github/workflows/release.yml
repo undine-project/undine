@@ -10,7 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Нужно для получения тегов
+          # Needed to fetch tags
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -22,31 +23,31 @@ jobs:
 
       - name: Generate version
         run: |
-          # Пытаемся получить последний тег
+          # Attempt to get the last tag
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           
           if [ -z "$PREVIOUS_TAG" ]; then
-            # Если тегов нет, это первый релиз
+            # If there are no tags, this is the first release
             NEW_TAG="v0.1.0"
           else
-            # Проверяем, существуют ли уже теги в формате semver
+            # Check if there are already tags in semver format
             if [[ $PREVIOUS_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              # Если тег уже в формате semver, увеличиваем patch версию
+              # If the tag is already in semver format, increment the patch version
               IFS='.' read -r major minor patch <<< "${PREVIOUS_TAG#v}"
               NEW_TAG="v$major.$minor.$((patch + 1))"
             else
-              # Если тег в старом формате, начинаем с v0.1.0
+              # If the tag is in the old format, start with v0.1.0
               NEW_TAG="v0.1.0"
-              # Проверяем, существует ли уже такой тег
+              # Check if such a tag already exists
               while git rev-parse $NEW_TAG >/dev/null 2>&1; do
-                # Если тег существует, увеличиваем patch версию
+                # If the tag exists, increment the patch version
                 IFS='.' read -r major minor patch <<< "${NEW_TAG#v}"
                 NEW_TAG="v$major.$minor.$((patch + 1))"
               done
             fi
           fi
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
-          # Получаем короткий хеш текущего коммита
+          # Get the short hash of the current commit
           COMMIT_HASH=$(git rev-parse --short HEAD)
           echo "RELEASE_NAME=Release at #${COMMIT_HASH}" >> $GITHUB_ENV
 
@@ -59,7 +60,7 @@ jobs:
 
       - name: Create source archive
         run: |
-          # Создаем архив с исходным кодом, исключая бинарные файлы и временные директории
+          # Create an archive with the source code, excluding binary files and temporary directories
           git archive --prefix=undine-${{ env.NEW_TAG }}/ --format=zip -o bin/undine-${{ env.NEW_TAG }}.zip HEAD
 
       - name: Create Release
